@@ -1,0 +1,4 @@
+build-*/
+Toolchain-*.cmake
+meson-cross-*.txt
+sysroot/
