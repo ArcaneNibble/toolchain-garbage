@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
+import glob
 import os
 import os.path
 import shutil
 import subprocess
+import sys
 
 SYSROOT_NAME = 'sysroot'
 LLVM_HEADERS_PATH = os.path.realpath(
@@ -356,6 +358,17 @@ def build_for_cpu(cpu):
 
 
 def main():
+    if len(sys.argv) >= 2 and sys.argv[1] == "clean":
+        print("CLEAN!")
+        for x in glob.glob("build-*"):
+            shutil.rmtree(x, ignore_errors=True)
+        for x in glob.glob("meson-cross-*.txt"):
+            os.remove(x)
+        for x in glob.glob("Toolchain-*.cmake"):
+            os.remove(x)
+        shutil.rmtree(SYSROOT_NAME, ignore_errors=True)
+        return
+
     # shutil.copytree(LLVM_HEADERS_PATH, "sysroot/include", dirs_exist_ok=True)
     if not os.path.exists(SYSROOT_NAME):
         os.makedirs(SYSROOT_NAME)
