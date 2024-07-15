@@ -274,6 +274,71 @@ def build_wasi_cxx():
                    "--target", "install"], check=True)
 
 
+def build_cxx(cpu, enable_exceptions, enable_rtti):
+    variant = "-"
+    if enable_exceptions:
+        variant += "exc-"
+    else:
+        variant += "noexc-"
+    if enable_rtti:
+        variant += "rtti"
+    else:
+        variant += "nortti"
+
+    if enable_exceptions:
+        enable_exceptions_str = "ON"
+    else:
+        enable_exceptions_str = "OFF"
+    if enable_rtti:
+        enable_rtti_str = "ON"
+    else:
+        enable_rtti_str = "OFF"
+
+    sysroot = os.path.realpath(SYSROOT_NAME)
+    cmake_toolchain = os.path.realpath(f'Toolchain-{cpu}.cmake')
+    build_dir = f"build-libcxx-{cpu}{variant}"
+    multilib_path = MULTILIB_PATHS[cpu]
+    shutil.rmtree(build_dir, ignore_errors=True)
+
+    subprocess.run(["cmake", "-G", "Ninja",
+                    "-S", CXX_RUNTIMES_LOCATION,
+                    "-B", build_dir,
+                    f"-DCMAKE_TOOLCHAIN_FILE={cmake_toolchain}",
+                    "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY",
+                    "-DLIBCXXABI_BAREMETAL=ON",
+                    "-DLIBCXXABI_ENABLE_ASSERTIONS=OFF",
+                    "-DLIBCXXABI_ENABLE_SHARED=OFF",
+                    "-DLIBCXXABI_ENABLE_STATIC=ON",
+                    "-DLIBCXXABI_USE_COMPILER_RT=ON",
+                    "-DLIBCXXABI_USE_LLVM_UNWINDER=ON",
+                    "-DLIBCXX_ABI_UNSTABLE=ON",
+                    "-DLIBCXX_CXX_ABI=libcxxabi",
+                    "-DLIBCXX_ENABLE_FILESYSTEM=OFF",
+                    "-DLIBCXX_ENABLE_SHARED=OFF",
+                    "-DLIBCXX_ENABLE_STATIC=ON",
+                    "-DLIBCXX_INCLUDE_BENCHMARKS=OFF",
+                    "-DLIBUNWIND_ENABLE_SHARED=OFF",
+                    "-DLIBUNWIND_ENABLE_STATIC=ON",
+                    "-DLIBUNWIND_IS_BAREMETAL=ON",
+                    "-DLIBUNWIND_REMEMBER_HEAP_ALLOC=ON",
+                    "-DLIBUNWIND_USE_COMPILER_RT=ON",
+                    "-DLLVM_ENABLE_RUNTIMES=libcxxabi;libcxx;libunwind",
+                    "-DLIBCXXABI_ENABLE_THREADS=OFF",
+                    "-DLIBCXX_ENABLE_MONOTONIC_CLOCK=OFF",
+                    "-DLIBCXX_ENABLE_RANDOM_DEVICE=OFF",
+                    "-DLIBCXX_ENABLE_THREADS=OFF",
+                    "-DLIBCXX_ENABLE_WIDE_CHARACTERS=OFF",
+                    "-DLIBUNWIND_ENABLE_THREADS=OFF",
+                    f"-DLIBCXXABI_ENABLE_EXCEPTIONS={enable_exceptions_str}",
+                    f"-DLIBCXXABI_ENABLE_STATIC_UNWINDER={enable_exceptions_str}",      # noqa
+                    f"-DLIBCXX_ENABLE_EXCEPTIONS={enable_exceptions_str}",
+                    f"-DLIBCXX_ENABLE_RTTI={enable_rtti_str}",
+                    f"-DCMAKE_INSTALL_PREFIX={sysroot}/{multilib_path}{variant}",    # noqa
+                    ], check=True)
+    subprocess.run(["cmake", "--build", build_dir,
+                   "--target", "install"], check=True)
+
+
 def build_for_cpu(cpu):
     print(f"Building for CPU \"{cpu}\"!")
     make_cmake_toolchain(cpu)
@@ -286,6 +351,8 @@ def build_for_cpu(cpu):
         build_wasi_cxx()
     else:
         build_picolibc(cpu)
+        for (enable_exceptions, enable_rtti) in [(False, False), (False, True), (True, True)]:
+            build_cxx(cpu, enable_exceptions, enable_rtti)
 
 
 def main():

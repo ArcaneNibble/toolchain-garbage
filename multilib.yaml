@@ -9,3 +9,6 @@ Variants:
 - Dir: cm01
   Flags: [--target=thumbv6m-unknown-none-eabi]
   Group: stdlibs
+
+- Dir: cm01-noexc-nortti
+  Flags: [--target=thumbv6m-unknown-none-eabi]
