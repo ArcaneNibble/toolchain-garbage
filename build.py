@@ -174,15 +174,6 @@ def build_compiler_rt(cpu):
     multilib_path = MULTILIB_PATHS[cpu]
     shutil.rmtree(build_dir, ignore_errors=True)
 
-    if cpu == 'wasi':
-        wasi_xxx_multilib_crap = [
-            "-DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON",
-        ]
-    else:
-        wasi_xxx_multilib_crap = [
-            "-DCOMPILER_RT_INSTALL_LIBRARY_DIR:PATH=lib",
-        ]
-
     subprocess.run(["cmake", "-G", "Ninja",
                     "-S", COMPILER_RT_LOCATION,
                     "-B", build_dir,
@@ -200,10 +191,21 @@ def build_compiler_rt(cpu):
                     "-DCOMPILER_RT_HAS_FPIC_FLAG=OFF",
                     "-DCOMPILER_RT_ENABLE_IOS=OFF",
                     "-DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON",
+                    "-DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON",
                     f"-DCMAKE_INSTALL_PREFIX={sysroot}/{multilib_path}",
-                    ] + wasi_xxx_multilib_crap, check=True)
+                    ], check=True)
     subprocess.run(["cmake", "--build", build_dir,
                    "--target", "install"], check=True)
+
+    if cpu != 'wasi':
+        # XXX don't know how to convice this otherwise
+        compiler_rt_file = glob.glob(
+            f"{SYSROOT_NAME}/{multilib_path}/lib/*/libclang_rt.builtins.a")
+        assert len(compiler_rt_file) == 1
+        compiler_rt_file = compiler_rt_file[0]
+        os.rename(compiler_rt_file,
+                  f"{SYSROOT_NAME}/{multilib_path}/lib/libclang_rt.builtins.a")
+        os.rmdir(os.path.dirname(compiler_rt_file))
 
 
 def build_wasi_libc():
