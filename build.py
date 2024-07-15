@@ -66,7 +66,7 @@ TARGET_FLAGS = {
     # We deliberately don't support softfp, don't really see the point
     'cortex-m4f': ['-march=armv7em', '-mfloat-abi=hard', '-mfpu=fpv4-sp-d16'],
 
-    'qingke-v2a': ['-march=rv32ec'],                        # FIXME: XW
+    'qingke-v2a': ['-march=rv32ec_xwchc'],
     'qingke-v34a': ['-march=rv32imac'],
     'qingke-v4bc': ['-march=rv32imac'],                     # FIXME: XW
     'qingke-v4f': ['-march=rv32imafc', '-mabi=ilp32f'],     # FIXME: XW
