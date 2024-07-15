@@ -37,7 +37,7 @@ TARGET_TRIPLES = {
     'cortex-m01': 'armv6m-unknown-none-eabi',
     'cortex-m3': 'armv7m-unknown-none-eabi',
     'cortex-m4': 'armv7em-unknown-none-eabi',
-    'cortex-m4f': 'armv7em-unknown-none-eabi',
+    'cortex-m4f': 'armv7em-unknown-none-eabihf',
 
     'qingke-v2a': 'riscv32-unknown-none-elf',
     'qingke-v34a': 'riscv32-unknown-none-elf',
@@ -357,6 +357,43 @@ def build_for_cpu(cpu):
             build_cxx(cpu, enable_exceptions, enable_rtti)
 
 
+def make_multilib_yaml():
+    with open(f"{SYSROOT_NAME}/multilib.yaml", 'w') as f:
+        f.write("MultilibVersion: 1.0\n")
+
+        f.write("Groups:\n")
+        f.write("- Name: c_libs\n")
+        f.write("  Type: Exclusive\n")
+        for cpu in CPU_VARIANTS:
+            if cpu == 'wasi':
+                continue
+            multilib_dir_name = MULTILIB_PATHS[cpu]
+            f.write(f"- Name: {multilib_dir_name}_cxx_libs\n")
+            f.write("  Type: Exclusive\n")
+
+        f.write("Variants:\n")
+        for cpu in CPU_VARIANTS:
+            if cpu == 'wasi':
+                continue
+            multilib_dir_name = MULTILIB_PATHS[cpu]
+            triple = TARGET_TRIPLES[cpu]
+            flags = TARGET_FLAGS[cpu]
+            if triple.startswith("arm"):
+                # XXX ugly
+                triple = "thumb" + triple[3:]
+                flags = [x for x in flags if not x.startswith("-march=")]
+            flags = [f'--target={triple}'] + flags
+            flags = ','.join((f"'{x}'" for x in flags))
+
+            f.write(f"- Dir: {multilib_dir_name}\n")
+            f.write(f"  Flags: [{flags}]\n")
+            f.write("  Group: c_libs\n")
+
+        f.write("Mappings:\n")
+        f.write("- Match: \"-mfloat-abi=softfp\"\n")
+        f.write("  Flags: [\"-mfloat-abi=soft\"]\n")
+
+
 def main():
     if len(sys.argv) >= 2 and sys.argv[1] == "clean":
         print("CLEAN!")
@@ -372,7 +409,7 @@ def main():
     # shutil.copytree(LLVM_HEADERS_PATH, "sysroot/include", dirs_exist_ok=True)
     if not os.path.exists(SYSROOT_NAME):
         os.makedirs(SYSROOT_NAME)
-    shutil.copyfile("multilib.yaml", f"{SYSROOT_NAME}/multilib.yaml")
+    make_multilib_yaml()
     for cpu in CPU_VARIANTS:
         build_for_cpu(cpu)
 
