@@ -68,8 +68,8 @@ TARGET_FLAGS = {
 
     'qingke-v2a': ['-march=rv32ec_xwchc'],
     'qingke-v34a': ['-march=rv32imac'],
-    'qingke-v4bc': ['-march=rv32imac'],                     # FIXME: XW
-    'qingke-v4f': ['-march=rv32imafc', '-mabi=ilp32f'],     # FIXME: XW
+    'qingke-v4bc': ['-march=rv32imac_xwchc'],
+    'qingke-v4f': ['-march=rv32imafc_xwchc', '-mabi=ilp32f'],
 }
 COMMON_FLAGS = ['-ffunction-sections', '-fdata-sections', '-fno-ident']
 
