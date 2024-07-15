@@ -8,7 +8,7 @@ import subprocess
 SYSROOT_NAME = 'sysroot'
 LLVM_HEADERS_PATH = os.path.realpath(
     "../llvm-project/llvm-prefix/lib/clang/19/include")
-TOOLCHAIN_BIN_PATH = '/opt/homebrew/opt/llvm/bin'
+TOOLCHAIN_BIN_PATH = '/Users/rqou/code/llvm-project/build-native/bin'
 COMPILER_RT_LOCATION = os.path.realpath("../llvm-project/compiler-rt")
 CXX_RUNTIMES_LOCATION = os.path.realpath("../llvm-project/runtimes")
 PICOLIBC_LOCATION = os.path.realpath("../picolibc")

@@ -12,3 +12,8 @@ Variants:
 
 - Dir: cm01-noexc-nortti
   Flags: [--target=thumbv6m-unknown-none-eabi]
+
+
+- Dir: qk-v34a
+  Flags: ['--target=riscv32-unknown-none-elf', '-march=rv32imac']
+  Group: stdlibs
