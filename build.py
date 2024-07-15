@@ -8,8 +8,8 @@ import subprocess
 import sys
 
 SYSROOT_NAME = 'sysroot'
-# LLVM_HEADERS_PATH = os.path.realpath(
-#     "../llvm-project/llvm-prefix/lib/clang/19/include")
+LLVM_HEADERS_PATH = os.path.realpath(
+    "../llvm-project/llvm-prefix/lib/clang/19/include")
 TOOLCHAIN_BIN_PATH = '/Users/rqou/code/llvm-project/build-native/bin'
 COMPILER_RT_LOCATION = os.path.realpath("../llvm-project/compiler-rt")
 CXX_RUNTIMES_LOCATION = os.path.realpath("../llvm-project/runtimes")
@@ -431,12 +431,15 @@ def main():
         shutil.rmtree(SYSROOT_NAME, ignore_errors=True)
         return
 
-    # shutil.copytree(LLVM_HEADERS_PATH, "sysroot/include", dirs_exist_ok=True)
     if not os.path.exists(SYSROOT_NAME):
         os.makedirs(SYSROOT_NAME)
     make_multilib_yaml()
     for cpu in CPU_VARIANTS:
         build_for_cpu(cpu)
+    shutil.copytree(LLVM_HEADERS_PATH,
+                    "sysroot/include", dirs_exist_ok=True)
+    shutil.copytree(LLVM_HEADERS_PATH,
+                    "sysroot/wasm32-wasip1/include", dirs_exist_ok=True)
 
 
 if __name__ == '__main__':
