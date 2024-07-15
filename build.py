@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 
+import os
 import os.path
 import shutil
 import subprocess
 
+SYSROOT_NAME = 'sysroot'
 LLVM_HEADERS_PATH = os.path.realpath(
     "../llvm-project/llvm-prefix/lib/clang/19/include")
 TOOLCHAIN_BIN_PATH = '/opt/homebrew/opt/llvm/bin'
 COMPILER_RT_LOCATION = os.path.realpath("../llvm-project/compiler-rt")
+CXX_RUNTIMES_LOCATION = os.path.realpath("../llvm-project/runtimes")
 PICOLIBC_LOCATION = os.path.realpath("../picolibc")
 WASI_LIBC_LOCATION = os.path.realpath("../wasi-libc")
 
@@ -86,7 +89,10 @@ MESON_CPUS = {
 
 
 def make_cmake_toolchain(cpu):
-    sysroot = os.path.realpath("sysroot")
+    sysroot = os.path.realpath(SYSROOT_NAME)
+    if cpu == 'wasi':
+        sysroot += '/wasm32-wasip1'
+
     fn = os.path.realpath(f'Toolchain-{cpu}.cmake')
 
     triple = TARGET_TRIPLES[cpu]
@@ -160,11 +166,21 @@ libgcc ='-lclang_rt.builtins'
 
 
 def build_compiler_rt(cpu):
-    sysroot = os.path.realpath("sysroot")
+    sysroot = os.path.realpath(SYSROOT_NAME)
     cmake_toolchain = os.path.realpath(f'Toolchain-{cpu}.cmake')
     build_dir = f"build-compiler-rt-{cpu}"
     multilib_path = MULTILIB_PATHS[cpu]
     shutil.rmtree(build_dir, ignore_errors=True)
+
+    if cpu == 'wasi':
+        wasi_xxx_multilib_crap = [
+            "-DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON",
+        ]
+    else:
+        wasi_xxx_multilib_crap = [
+            "-DCOMPILER_RT_INSTALL_LIBRARY_DIR:PATH=lib",
+        ]
+
     subprocess.run(["cmake", "-G", "Ninja",
                     "-S", COMPILER_RT_LOCATION,
                     "-B", build_dir,
@@ -181,39 +197,38 @@ def build_compiler_rt(cpu):
                     "-DCOMPILER_RT_HAS_FPIC_FLAG=OFF",
                     "-DCOMPILER_RT_ENABLE_IOS=OFF",
                     "-DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON",
-                    "-DCOMPILER_RT_INSTALL_LIBRARY_DIR:PATH="
-                    f"lib/{multilib_path}",
-                    f"-DCMAKE_INSTALL_PREFIX={sysroot}",
-                    ], check=True)
+                    f"-DCMAKE_INSTALL_PREFIX={sysroot}/{multilib_path}",
+                    ] + wasi_xxx_multilib_crap, check=True)
     subprocess.run(["cmake", "--build", build_dir,
                    "--target", "install"], check=True)
 
 
 def build_wasi_libc():
     triple = TARGET_TRIPLES['wasi']
-    sysroot = os.path.realpath("sysroot")
+    sysroot = os.path.realpath(SYSROOT_NAME)
+    multilib_path = MULTILIB_PATHS['wasi']
     subprocess.run(["make", "-C", WASI_LIBC_LOCATION,
                     f"CC={TOOLCHAIN_BIN_PATH}/clang",
                     f"AR={TOOLCHAIN_BIN_PATH}/llvm-ar",
                     f"NM={TOOLCHAIN_BIN_PATH}/llvm-nm",
                     f"TARGET_TRIPLE={triple}",
-                    f"SYSROOT={sysroot}",
+                    f"SYSROOT={sysroot}/{multilib_path}",
                     "-j8"
                     ], check=True)
 
 
 def build_picolibc(cpu):
-    sysroot = os.path.realpath("sysroot")
+    sysroot = os.path.realpath(SYSROOT_NAME)
     meson_toolchain = os.path.realpath(f'meson-cross-{cpu}.txt')
     build_dir = f"build-picolibc-{cpu}"
     multilib_path = MULTILIB_PATHS[cpu]
     shutil.rmtree(build_dir, ignore_errors=True)
     subprocess.run(["meson", "setup",
-                    f"-Dincludedir=include/{multilib_path}",
-                    f"-Dlibdir=lib/{multilib_path}",
+                    f"-Dincludedir=include",
+                    f"-Dlibdir=lib",
                     "-Dspecsdir=none",
                     "-Dmultilib=false",
-                    "--prefix", sysroot,
+                    "--prefix", f"{sysroot}/{multilib_path}",
                     "--cross-file", meson_toolchain,
                     "--buildtype=minsize",
                     PICOLIBC_LOCATION,
@@ -222,20 +237,62 @@ def build_picolibc(cpu):
     subprocess.run(["ninja", "-C", build_dir, "install"], check=True)
 
 
+def build_wasi_cxx():
+    sysroot = os.path.realpath(SYSROOT_NAME)
+    cmake_toolchain = os.path.realpath(f'Toolchain-wasi.cmake')
+    build_dir = f"build-libcxx-wasi"
+    shutil.rmtree(build_dir, ignore_errors=True)
+
+    subprocess.run(["cmake", "-G", "Ninja",
+                    "-S", CXX_RUNTIMES_LOCATION,
+                    "-B", build_dir,
+                    f"-DCMAKE_TOOLCHAIN_FILE={cmake_toolchain}",
+                    "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY",
+                    "-DLLVM_ENABLE_RUNTIMES:STRING=libcxx;libcxxabi",
+                    "-DLIBCXX_ENABLE_THREADS:BOOL=OFF",
+                    "-DLIBCXX_BUILD_EXTERNAL_THREAD_LIBRARY:BOOL=OFF",
+                    "-DLIBCXX_ENABLE_SHARED:BOOL=OFF",
+                    "-DLIBCXX_ENABLE_EXCEPTIONS:BOOL=OFF",
+                    "-DLIBCXX_ENABLE_FILESYSTEM:BOOL=ON",
+                    "-DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY:BOOL=OFF",
+                    "-DLIBCXX_ENABLE_ABI_LINKER_SCRIPT:BOOL=OFF",
+                    "-DLIBCXX_CXX_ABI=libcxxabi",
+                    "-DLIBCXX_HAS_MUSL_LIBC:BOOL=ON",
+                    "-DLIBCXX_ABI_VERSION=2",
+                    "-DLIBCXXABI_ENABLE_THREADS:BOOL=OFF",
+                    "-DLIBCXXABI_BUILD_EXTERNAL_THREAD_LIBRARY:BOOL=OFF",
+                    "-DLIBCXXABI_ENABLE_PIC:BOOL=OFF",
+                    "-DLIBCXXABI_ENABLE_SHARED:BOOL=OFF",
+                    "-DLIBCXXABI_ENABLE_EXCEPTIONS:BOOL=OFF",
+                    "-DLIBCXXABI_USE_LLVM_UNWINDER:BOOL=OFF",
+                    "-DLIBCXXABI_SILENT_TERMINATE:BOOL=ON",
+                    "-DLIBCXX_LIBDIR_SUFFIX=/wasm32-wasip1",
+                    "-DLIBCXXABI_LIBDIR_SUFFIX=/wasm32-wasip1",
+                    f"-DCMAKE_INSTALL_PREFIX={sysroot}/wasm32-wasip1",
+                    ], check=True)
+    subprocess.run(["cmake", "--build", build_dir,
+                   "--target", "install"], check=True)
+
+
 def build_for_cpu(cpu):
     print(f"Building for CPU \"{cpu}\"!")
     make_cmake_toolchain(cpu)
     if cpu != 'wasi':
         make_meson_toolchain(cpu)
     build_compiler_rt(cpu)
+
     if cpu == 'wasi':
         build_wasi_libc()
+        build_wasi_cxx()
     else:
         build_picolibc(cpu)
 
 
 def main():
     # shutil.copytree(LLVM_HEADERS_PATH, "sysroot/include", dirs_exist_ok=True)
+    if not os.path.exists(SYSROOT_NAME):
+        os.makedirs(SYSROOT_NAME)
+    shutil.copyfile("multilib.yaml", f"{SYSROOT_NAME}/multilib.yaml")
     for cpu in CPU_VARIANTS:
         build_for_cpu(cpu)
 

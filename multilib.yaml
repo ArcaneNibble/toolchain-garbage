@@ -1,0 +1,11 @@
+MultilibVersion: 1.0
+
+Groups:
+- Name: stdlibs
+  Type: Exclusive
+
+Variants:
+
+- Dir: cm01
+  Flags: [--target=thumbv6m-unknown-none-eabi]
+  Group: stdlibs
