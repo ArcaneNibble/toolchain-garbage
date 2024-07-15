@@ -8,8 +8,8 @@ import subprocess
 import sys
 
 SYSROOT_NAME = 'sysroot'
-LLVM_HEADERS_PATH = os.path.realpath(
-    "../llvm-project/llvm-prefix/lib/clang/19/include")
+# LLVM_HEADERS_PATH = os.path.realpath(
+#     "../llvm-project/llvm-prefix/lib/clang/19/include")
 TOOLCHAIN_BIN_PATH = '/Users/rqou/code/llvm-project/build-native/bin'
 COMPILER_RT_LOCATION = os.path.realpath("../llvm-project/compiler-rt")
 CXX_RUNTIMES_LOCATION = os.path.realpath("../llvm-project/runtimes")
@@ -383,11 +383,32 @@ def make_multilib_yaml():
                 triple = "thumb" + triple[3:]
                 flags = [x for x in flags if not x.startswith("-march=")]
             flags = [f'--target={triple}'] + flags
-            flags = ','.join((f"'{x}'" for x in flags))
+            flags_str = ','.join((f"'{x}'" for x in flags))
 
             f.write(f"- Dir: {multilib_dir_name}\n")
-            f.write(f"  Flags: [{flags}]\n")
+            f.write(f"  Flags: [{flags_str}]\n")
             f.write("  Group: c_libs\n")
+
+            for (enable_exceptions, enable_rtti) in [(False, False), (False, True), (True, True)]:
+                variant = "-"
+                flags2 = list(flags)
+                if enable_exceptions:
+                    variant += "exc-"
+                    flags2.append("-fexceptions")
+                else:
+                    variant += "noexc-"
+                    flags2.append("-fno-exceptions")
+                if enable_rtti:
+                    variant += "rtti"
+                    flags2.append("-frtti")
+                else:
+                    variant += "nortti"
+                    flags2.append("-fno-rtti")
+                flags_str = ','.join((f"'{x}'" for x in flags2))
+
+                f.write(f"- Dir: {multilib_dir_name}{variant}\n")
+                f.write(f"  Flags: [{flags_str}]\n")
+                f.write(f"  Group: {multilib_dir_name}_cxx_libs\n")
 
         f.write("Mappings:\n")
         f.write("- Match: \"-mfloat-abi=softfp\"\n")
